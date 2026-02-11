@@ -138,6 +138,10 @@ esac
 
 os_version=$(rpm -q "${old_release}" --qf "%{version}")
 major_os_version=${os_version:0:1}
+case "$major_os_version" in
+    8|9) best_flag="--nobest" ;;
+    *)   best_flag="--skip-broken" ;;
+esac
 if "${install_uek_kernel}"; then
   base_packages=(basesystem initscripts oracle-logos kernel-uek)
 else
@@ -375,10 +379,10 @@ if ! have_program yumdownloader; then
     case "$os_version" in
         6*)
             curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle https://yum.oracle.com/RPM-GPG-KEY-oracle-ol6
-            yum -y install yum-utils --disablerepo \* --enablerepo ol6_latest || true
+            yum -y "$best_flag" install yum-utils --disablerepo \* --enablerepo ol6_latest || true
             ;;
         *)
-            yum -y install yum-utils --disablerepo ol\* || true
+            yum -y "$best_flag" install yum-utils --disablerepo ol\* || true
             ;;
     esac
     dep_check yumdownloader
@@ -526,13 +530,14 @@ for reponame in ${enabled_repos}; do
         elif [ "${action[0]}" == "RPM" ] ; then
             matching_rpm=${action[1]}
             echo "Installing ${matching_rpm} to get content that replaces ${reponame}"
-            yum --assumeyes --disablerepo "*" --enablerepo "ol*_latest" install "${matching_rpm}"
+            yum --assumeyes "$best_flag" --disablerepo "*" --enablerepo "ol*_latest" install "${matching_rpm}"
         fi
     fi
 done
 
 echo "Installing base packages for Oracle Linux..."
-if ! yum shell -y <<EOF
+if ! yum shell -y "$best_flag" <<EOF
+set skip-broken 1
 remove ${bad_packages[@]}
 install ${base_packages[@]}
 run
@@ -548,7 +553,7 @@ fi
 
 echo "Switch successful. Syncing with Oracle Linux repositories."
 
-if ! yum -y distro-sync; then
+if ! yum -y "$best_flag" distro-sync; then
     exit_message "Could not automatically sync with Oracle Linux repositories.
 Check the output of 'yum distro-sync' to manually resolve the issue."
 fi
@@ -579,7 +584,7 @@ case "$os_version" in
                     ;;
                 esac
             done
-            dnf --assumeyes --disablerepo "*" --enablerepo "ol8_appstream" update
+            dnf --assumeyes --nobest --disablerepo "*" --enablerepo "ol8_appstream" update
         fi
 
         # Two logo RPMs aren't currently covered by 'replaces' metadata, replace by hand.
@@ -608,7 +613,7 @@ if "${reinstall_all_rpms}"; then
 
     if [[ -n "${list_of_centos_rpms[*]}" ]] && [[ "${#list_of_centos_rpms[@]}" -ne 0 ]]; then
         echo "Reinstalling RPMs: ${list_of_centos_rpms[*]}"
-        yum --assumeyes --disablerepo "*" --enablerepo "ol*" reinstall "${list_of_centos_rpms[@]}"
+        yum --assumeyes "$best_flag" --disablerepo "*" --enablerepo "ol*" reinstall "${list_of_centos_rpms[@]}"
     fi
     # See if non-Oracle RPMs are present and print them
     mapfile -t non_oracle_rpms < <(rpm -qa --qf "%{NAME}-%{VERSION}-%{RELEASE}|%{VENDOR}|%{PACKAGER}\n" |grep -v Oracle)

@@ -41,3 +41,21 @@ suites:
     verifier:
       inspec_tests:
         - test/integration/uek
+  - name: nobest
+    # Only run on EL7 where --skip-broken is exercised
+    includes:
+      - centos-7.9
+    # Pre-install EPEL packages that have no exact OL equivalent version,
+    # simulating a real server with 3rd-party packages that would cause
+    # yum distro-sync to fail without --skip-broken.
+    # CentOS 7 EOL: redirect yum to vault.centos.org before installing EPEL.
+    lifecycle:
+      pre_converge:
+        - remote: >-
+            sudo sed -i "s/^mirrorlist=/#mirrorlist=/g" /etc/yum.repos.d/CentOS-*.repo &&
+            sudo sed -i "s|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*.repo &&
+            sudo yum install -y epel-release &&
+            sudo yum install -y htop jq
+    verifier:
+      inspec_tests:
+        - test/integration/nobest

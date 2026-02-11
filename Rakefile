@@ -39,6 +39,13 @@ begin
   namespace :integration do
     task :set_vagrant, [:regex] do |_t, _args|
       ENV['KITCHEN_LOCAL_YAML'] = './.kitchen.yml'
+      # Prevent bundler env vars from leaking into the vagrant subprocess.
+      # Vagrant has its own embedded Ruby and will fail if it inherits these.
+      %w[
+        BUNDLE_GEMFILE BUNDLE_BIN_PATH BUNDLE_PATH BUNDLER_VERSION BUNDLER_SETUP
+        RUBYOPT RUBYLIB GEM_HOME GEM_PATH
+      ].each { |k| ENV.delete(k) }
+      ENV.keys.select { |k| k.start_with?('BUNDLER_ORIG_') }.each { |k| ENV.delete(k) }
     end
 
     desc 'Run Test Kitchen with Vagrant'
@@ -84,6 +91,47 @@ begin
 
       desc 'Test (destroy, create, converge, setup, verify and destroy) one or more vagrant instances'
       task :test, [:regex] => :set_vagrant do |_t, args|
+        Kitchen::CLI.new([], concurrency: concurrency, destroy: 'always').test args[:regex]
+      end
+    end
+
+    task :set_docker, [:regex] do |_t, _args|
+      ENV['KITCHEN_LOCAL_YAML'] = './.kitchen.docker.yml'
+    end
+
+    desc 'Run Test Kitchen with Docker'
+    task :docker, [:regex] => :set_docker do |_t, args|
+      Kitchen::CLI.new([], concurrency: concurrency, destroy: 'always').test args[:regex]
+    end
+
+    namespace :docker do
+      desc 'Lists one or more Docker instances'
+      task :list, [:regex] => :set_docker do |_t, args|
+        Kitchen::CLI.new([], concurrency: concurrency).list args[:regex]
+      end
+
+      desc 'Start one or more Docker instances'
+      task :create, [:regex] => :set_docker do |_t, args|
+        Kitchen::CLI.new([], concurrency: concurrency).create args[:regex]
+      end
+
+      desc 'Use a provisioner to configure one or more Docker instances'
+      task :converge, [:regex] => :set_docker do |_t, args|
+        Kitchen::CLI.new([], concurrency: concurrency).converge args[:regex]
+      end
+
+      desc 'Run automated tests on one or more Docker instances'
+      task :verify, [:regex] => :set_docker do |_t, args|
+        Kitchen::CLI.new([], concurrency: concurrency).verify args[:regex]
+      end
+
+      desc 'Delete all information for one or more Docker instances'
+      task :destroy, [:regex] => :set_docker do |_t, args|
+        Kitchen::CLI.new([]).destroy args[:regex]
+      end
+
+      desc 'Test (destroy, create, converge, setup, verify and destroy) one or more Docker instances'
+      task :test, [:regex] => :set_docker do |_t, args|
         Kitchen::CLI.new([], concurrency: concurrency, destroy: 'always').test args[:regex]
       end
     end

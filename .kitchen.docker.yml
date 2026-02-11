@@ -1,0 +1,39 @@
+---
+driver:
+  name: docker
+  privileged: true
+  use_sudo: false
+
+verifier:
+  name: inspec
+
+provisioner:
+  name: shell
+  script: centos2ol.sh
+
+platforms:
+  - name: centos-7
+    driver:
+      image: centos:7
+      run_command: /usr/sbin/init
+
+  - name: centos-8
+    driver:
+      image: centos:8
+      run_command: /usr/sbin/init
+      # CentOS 8 reached EOL; fix vault mirrors so yum works during image build
+      provision_command:
+        - sed -i 's|mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo
+        - sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+
+suites:
+  - name: default
+    provisioner:
+      arguments: ['-k']
+    verifier:
+      inspec_tests:
+        - test/integration/default
+  - name: uek
+    verifier:
+      inspec_tests:
+        - test/integration/uek
